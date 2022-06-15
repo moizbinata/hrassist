@@ -1,0 +1,185 @@
+//SIGN IN WITH GOOGLE THROUGH FIREBASE AUTH
+ setState(() {
+    loader = !loader;
+});
+final provider = Provider.of<GoogleSignInProvider>(
+    context,
+    listen: false);
+provider.googleLogin().whenComplete(
+    () {
+    Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => Home3()),
+    );
+    },
+);
+//UPLOAD VIDEO TO FIREBASE
+   Future<void> uploadVideos(int i, File file2) async {
+      String name = DateTime.now().toString();
+
+      firebase_storage.Reference ref = firebase_storage.FirebaseStorage.instance
+          .ref()
+          .child(name + currUser + "Video"); //string interpolation
+
+      try {
+        // await ref.putFile(file);
+        await ref.putFile(file2);
+
+        print("FILE UPLOADEDD SUCCESFILLY");
+        String downloadedUrl = await ref.getDownloadURL();
+        print("DOWNLOAD URL IS" + downloadedUrl);
+        // User? userCredential = FirebaseAuth.instance.currentUser;
+        await db.collection("interviewee_details").doc(currUser).update(
+          {
+            "q" + i.toString() + "_video": "$downloadedUrl",
+            "questionaireID": q_id,
+          },
+        ).whenComplete(() {
+          setState(() {
+            loader = false;
+          });
+        });
+        Fluttertoast.showToast(msg: "Your video interview has uploaded");
+        Navigator.popAndPushNamed(context, '/QuestionList');
+        Navigator.pop(context);
+      } catch (e) {
+        print("NOt uploadedddddddd");
+        print(e.toString());
+      }
+      return Future.delayed(
+          const Duration(seconds: 2), () => print('Large Latte'));
+    }
+//PICK IMAGE
+
+    void pickImage() async {
+      final ImagePicker _picker = ImagePicker();
+      final image = await _picker.pickVideo(
+          source: ImageSource.camera, maxDuration: const Duration(seconds: 10));
+      setState(() {
+        imagePath = image!.path;
+      });
+      print(imagePath);
+      if (imagePath.isNotEmpty) {
+        setState(() {
+          videoStatus = "Image selected";
+        });
+      } else if (imagePath.isEmpty) {
+        setState(() {
+          videoStatus = "Image not selected";
+        });
+      }
+    }
+//GET QuestionList
+  void getQuestions() async {
+    final DocumentSnapshot snapshotUser = await db
+        .collection("interviewee_details")
+        .doc(widget.intervieweeID)
+        .get();
+    if (snapshotUser.exists) {
+      setState(() {
+        snapshotUsers = snapshotUser;
+      });
+      print("moizata");
+      print(snapshotUsers['email']);
+    } else {
+      print("moizata");
+      print("none");
+    }
+  }
+  //REGISTER EMPLOYER
+      void register() async {
+      setState(() {
+        loader = true;
+      });
+      String imageName = path.basename(imagePath);
+      firebase_storage.Reference ref =
+          firebase_storage.FirebaseStorage.instance.ref('/$imageName');
+      File file = File(imagePath);
+      FirebaseAuth auth = FirebaseAuth.instance;
+
+      try {
+        await ref.putFile(file);
+        print("file uploaded successfully");
+        String downloadedUrl = await ref.getDownloadURL();
+        print(downloadedUrl);
+        print("email will send to " + email);
+        User? userCredential = auth.currentUser;
+        final UserCredential user = await auth
+            .createUserWithEmailAndPassword(email: email, password: password)
+            .whenComplete(
+              () async => {
+                await userCredential!.sendEmailVerification(),
+                setState(() {
+                  cupertinoTabBarValue = 0;
+                  changeLicenseStatus();
+                }),
+                print("email sent"),
+              },
+            );
+        setState(() {
+          recruiterID = user.user!.uid;
+        });
+        print("RECRUITER ID");
+        print(recruiterID);
+        await db.collection("users").doc(user.user!.uid).set(
+          {
+            "email": email,
+            "username": username,
+            "pictureUrl": downloadedUrl,
+            "mobileNumber": mobile,
+            "companyName": companyName,
+            "licenseKey": licenseKey,
+            "q1_title": "Motivation",
+            "q1_detail": "What motivates you? ",
+            "q2_title": "Disappointment",
+            "q2_detail": "What has disappointed you about work? ",
+            "q3_title": "Co-workers",
+            "q3_detail": "What irritates you about co-workers?",
+            "q4_title": "Hatred for job type",
+            "q4_detail": "Have you ever worked in a job that you hated?",
+            "q5_title": "Sacrifice for company",
+            "q5_detail":
+                "Are you willing to make sacrifices for this company? ",
+            "q6_title": "Skills",
+            "q6_detail":
+                "Do your skills match this job or another job more closely?",
+            "q7_title": "Stress",
+            "q7_detail": "How do you cope with stress?",
+            "q8_title": "Overtime",
+            "q8_detail":
+                "Are you willing to work overtime? Prepare for nightshift and work on Weekends?",
+            "q9_title": "Work under pressure",
+            "q9_detail": "Describe your ability to work under pressure. ",
+            "q10_title": "Best thing about you",
+            "q10_detail":
+                "What would your previous supervisor say your best point is?",
+          },
+        ).whenComplete(() {
+          Fluttertoast.showToast(msg: "Your information has inserted")
+              .whenComplete(() {
+            setState(() {
+              loader = false;
+            });
+          });
+        });
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'weak-password') {
+          Fluttertoast.showToast(msg: "The password provided is too weak.")
+              .whenComplete(() {
+            setState(() {
+              loader = false;
+            });
+          });
+        } else if (e.code == 'email-already-in-use') {
+          Fluttertoast.showToast(
+                  msg: "The account already exists for that email.")
+              .whenComplete(() {
+            setState(() {
+              loader = false;
+            });
+          });
+        }
+      } catch (e) {
+        print(e);
+      }
+    }
